@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "unity-mcp": {
+      "command": "python",
+      "args": ["/absolute/path/to/unity-mcp-server/main.py"],
+      "env": {
+        "UNITY_EDITOR_PATH": "/Applications/Unity/Hub/Editor/2022.3.0f1/Unity.app/Contents/MacOS/Unity",
+        "UNITY_PROJECT_PATH": "/path/to/your/unity/project",
+        "UNITY_LOG_LEVEL": "INFO",
+        "MCP_MAX_OPERATION_TIME": "300",
+        "MCP_ALLOWED_PATHS": "/Users/username/UnityProjects,/Users/username/Documents/Unity",
+        "MCP_BLOCKED_EXTENSIONS": ".exe,.dll,.so,.dylib,.bat,.sh,.ps1"
+      }
+    }
+  }
+}

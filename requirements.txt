@@ -1,0 +1,32 @@
+# Unity MCP Server Dependencies
+
+# MCP Framework
+mcp>=1.0.0
+
+# Core Dependencies
+pydantic>=2.0.0
+typing-extensions>=4.0.0
+
+# Process Management
+psutil>=5.9.0
+
+# File System Operations
+watchdog>=3.0.0
+pathspec>=0.11.0
+
+# JSON and Data Processing
+orjson>=3.8.0
+
+# Logging and Monitoring
+structlog>=23.0.0
+
+# Development Dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
+
+# Optional: For advanced Unity integration
+xml2dict>=0.2.2
+pillow>=10.0.0
