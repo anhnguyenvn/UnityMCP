@@ -1,10 +1,18 @@
 # Unity MCP Server Dependencies
+# Note: MCP framework requires Python 3.10+
+# For Python 3.9, we'll use basic JSON-RPC implementation
 
-# MCP Framework
-mcp>=1.0.0
+# MCP Framework - Requires Python 3.10+
+# mcp>=1.0.0
+# fastmcp>=0.1.0
+
+# Basic JSON-RPC for Python 3.9 compatibility
+jsonrpc-base>=2.0.0
+jsonrpc-websocket>=3.0.0
 
 # Core Dependencies
 pydantic>=2.0.0
+pydantic-settings>=2.0.0
 typing-extensions>=4.0.0
 
 # Process Management

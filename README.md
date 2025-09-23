@@ -29,46 +29,51 @@ A Model Context Protocol (MCP) server that provides Unity Engine integration for
 ## Installation
 
 ### Prerequisites
-- Python 3.8 or higher
-- Unity Editor (2020.3 LTS or higher recommended)
-- pip or uv package manager
+- **Python 3.10 or higher** (Required for MCP framework)
+- Unity Editor (2023.3.0f1 or higher recommended)
+- Claude Desktop or other MCP client
 
-### Setup
+⚠️ **Important**: The MCP (Model Context Protocol) framework requires Python 3.10+. Please upgrade if you're using an older version.
 
-1. **Clone or download the Unity MCP Server:**
+### Quick Setup
+
+1. **Clone the Unity MCP Server:**
    ```bash
-   git clone <repository-url>
-   cd unity-mcp-server
+   git clone https://github.com/anhnguyenvn/UnityMCP.git
+   cd UnityMCP
    ```
 
 2. **Install Python dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
-   
-   Or using uv (recommended):
+
+3. **Configure Unity paths:**
+   Create a `.env` file in the project root:
    ```bash
-   uv pip install -r requirements.txt
+   UNITY_MCP_UNITY_EDITOR_PATH=/Applications/Unity/Hub/Editor/2023.3.0f1/Unity.app/Contents/MacOS/Unity
+   UNITY_MCP_UNITY_PROJECT_PATH=/path/to/your/unity/project
+   UNITY_MCP_LOG_LEVEL=INFO
    ```
 
-3. **Configure environment variables (optional):**
+4. **Copy Unity Bridge script to your Unity project:**
    ```bash
-   export UNITY_EDITOR_PATH="/Applications/Unity/Hub/Editor/2022.3.0f1/Unity.app/Contents/MacOS/Unity"
-   export UNITY_PROJECT_PATH="/path/to/your/unity/project"
-   export UNITY_LOG_LEVEL="INFO"
+   cp unity_bridge.cs /path/to/your/unity/project/Assets/Scripts/
    ```
+
+📖 **For detailed installation instructions, see [INSTALLATION.md](INSTALLATION.md)**
 
 ## Configuration
 
-The server can be configured through environment variables or command-line arguments:
+The server can be configured through environment variables, `.env` file, or command-line arguments:
 
-### Environment Variables
-- `UNITY_EDITOR_PATH` - Path to Unity Editor executable
-- `UNITY_PROJECT_PATH` - Default Unity project path
-- `UNITY_LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
-- `MCP_MAX_OPERATION_TIME` - Maximum operation timeout in seconds
-- `MCP_ALLOWED_PATHS` - Comma-separated list of allowed file paths
-- `MCP_BLOCKED_EXTENSIONS` - Comma-separated list of blocked file extensions
+### Environment Variables (with UNITY_MCP_ prefix)
+- `UNITY_MCP_UNITY_EDITOR_PATH` - Path to Unity Editor executable
+- `UNITY_MCP_UNITY_PROJECT_PATH` - Default Unity project path
+- `UNITY_MCP_LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
+- `UNITY_MCP_MAX_OPERATION_TIME` - Maximum operation timeout in seconds
+- `UNITY_MCP_ALLOWED_PATHS` - Comma-separated list of allowed file paths
+- `UNITY_MCP_BLOCKED_EXTENSIONS` - Comma-separated list of blocked file extensions
 
 ### Command Line Arguments
 ```bash
@@ -105,18 +110,26 @@ Add the Unity MCP Server to your Claude Desktop configuration:
      "mcpServers": {
        "unity-mcp": {
          "command": "python",
-         "args": ["/absolute/path/to/unity-mcp-server/main.py"],
+         "args": ["/absolute/path/to/UnityMCP/main.py"],
          "env": {
-           "UNITY_EDITOR_PATH": "/Applications/Unity/Hub/Editor/2022.3.0f1/Unity.app/Contents/MacOS/Unity",
-           "UNITY_PROJECT_PATH": "/path/to/your/unity/project",
-           "UNITY_LOG_LEVEL": "INFO"
+           "UNITY_MCP_UNITY_EDITOR_PATH": "/Applications/Unity/Hub/Editor/2023.3.0f1/Unity.app/Contents/MacOS/Unity",
+           "UNITY_MCP_UNITY_PROJECT_PATH": "/path/to/your/unity/project",
+           "UNITY_MCP_LOG_LEVEL": "INFO"
          }
        }
      }
    }
    ```
 
-3. **Restart Claude Desktop** to load the new MCP server.
+3. **Use the provided example config:**
+   ```bash
+   cp claude_desktop_config.example.json claude_desktop_config.json
+   # Edit the paths in claude_desktop_config.json
+   ```
+
+4. **Restart Claude Desktop** to load the new MCP server.
+
+📖 **For detailed Claude Desktop setup, see [CLAUDE_DESKTOP_SETUP.md](CLAUDE_DESKTOP_SETUP.md)**
 
 ### Unity Project Setup
 
@@ -128,6 +141,28 @@ For full functionality, copy the Unity Bridge script to your Unity project:
    ```
 
 2. **The script will be automatically compiled by Unity** and provide enhanced MCP integration.
+
+### Running the Server
+
+#### Test the server (standalone mode)
+```bash
+python main.py
+```
+
+#### With specific Unity project
+```bash
+python main.py --project /path/to/unity/project
+```
+
+#### With custom Unity Editor
+```bash
+python main.py --unity-editor /path/to/Unity.app/Contents/MacOS/Unity
+```
+
+#### Validate configuration
+```bash
+python main.py --validate-only
+```
 
 ## Examples
 
