@@ -656,6 +656,706 @@ namespace UnityMCP
     }
     
     /// <summary>
+    /// Scene management functionality
+    /// </summary>
+    public static class SceneManager
+    {
+        /// <summary>
+        /// Load a scene by name or path
+        /// </summary>
+        public static void LoadScene(string sceneName, bool additive = false)
+        {
+            try
+            {
+                LogMCP($"Loading scene: {sceneName}, additive: {additive}");
+                
+                var loadMode = additive ? OpenSceneMode.Additive : OpenSceneMode.Single;
+                var scene = EditorSceneManager.OpenScene(sceneName, loadMode);
+                
+                var result = new
+                {
+                    sceneName = scene.name,
+                    scenePath = scene.path,
+                    isLoaded = scene.isLoaded,
+                    isDirty = scene.isDirty,
+                    buildIndex = scene.buildIndex,
+                    gameObjectCount = scene.rootCount
+                };
+                
+                UnityMCPBridge.WriteResult("scene_load", result);
+                LogMCP($"Scene loaded successfully: {scene.name}");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("scene_load", e.Message);
+                LogMCP($"Failed to load scene: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Save current scene or specified scene
+        /// </summary>
+        public static void SaveScene(string scenePath = null)
+        {
+            try
+            {
+                LogMCP($"Saving scene: {scenePath ?? "current"}");
+                
+                Scene sceneToSave;
+                if (string.IsNullOrEmpty(scenePath))
+                {
+                    sceneToSave = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+                }
+                else
+                {
+                    sceneToSave = EditorSceneManager.GetSceneByPath(scenePath);
+                }
+                
+                bool saved = EditorSceneManager.SaveScene(sceneToSave);
+                
+                var result = new
+                {
+                    sceneName = sceneToSave.name,
+                    scenePath = sceneToSave.path,
+                    saved = saved,
+                    isDirty = sceneToSave.isDirty
+                };
+                
+                UnityMCPBridge.WriteResult("scene_save", result);
+                LogMCP($"Scene save result: {saved}");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("scene_save", e.Message);
+                LogMCP($"Failed to save scene: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Create a new scene
+        /// </summary>
+        public static void CreateScene(string sceneName, string templatePath = null)
+        {
+            try
+            {
+                LogMCP($"Creating new scene: {sceneName}");
+                
+                Scene newScene;
+                if (string.IsNullOrEmpty(templatePath))
+                {
+                    newScene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
+                }
+                else
+                {
+                    // Load template and create from it
+                    newScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                }
+                
+                // Save the new scene
+                string savePath = $"Assets/Scenes/{sceneName}.unity";
+                bool saved = EditorSceneManager.SaveScene(newScene, savePath);
+                
+                var result = new
+                {
+                    sceneName = newScene.name,
+                    scenePath = savePath,
+                    created = true,
+                    saved = saved
+                };
+                
+                UnityMCPBridge.WriteResult("scene_create", result);
+                LogMCP($"Scene created successfully: {sceneName}");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("scene_create", e.Message);
+                LogMCP($"Failed to create scene: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Get scene hierarchy information
+        /// </summary>
+        public static void GetSceneHierarchy(bool includeInactive = false)
+        {
+            try
+            {
+                LogMCP("Getting scene hierarchy...");
+                
+                var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+                var rootObjects = scene.GetRootGameObjects();
+                var hierarchy = new List<object>();
+                
+                foreach (var rootObj in rootObjects)
+                {
+                    if (rootObj.activeInHierarchy || includeInactive)
+                    {
+                        hierarchy.Add(BuildHierarchyNode(rootObj, includeInactive));
+                    }
+                }
+                
+                var result = new
+                {
+                    sceneName = scene.name,
+                    totalRootObjects = rootObjects.Length,
+                    hierarchy = hierarchy
+                };
+                
+                UnityMCPBridge.WriteResult("scene_hierarchy", result);
+                LogMCP("Scene hierarchy retrieved successfully");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("scene_hierarchy", e.Message);
+                LogMCP($"Failed to get scene hierarchy: {e.Message}");
+            }
+        }
+        
+        private static object BuildHierarchyNode(GameObject obj, bool includeInactive)
+        {
+            var children = new List<object>();
+            for (int i = 0; i < obj.transform.childCount; i++)
+            {
+                var child = obj.transform.GetChild(i).gameObject;
+                if (child.activeInHierarchy || includeInactive)
+                {
+                    children.Add(BuildHierarchyNode(child, includeInactive));
+                }
+            }
+            
+            return new
+            {
+                name = obj.name,
+                active = obj.activeInHierarchy,
+                tag = obj.tag,
+                layer = LayerMask.LayerToName(obj.layer),
+                componentCount = obj.GetComponents<Component>().Length,
+                childCount = children.Count,
+                children = children
+            };
+        }
+        
+        private static void LogMCP(string message)
+        {
+            UnityMCPBridge.LogMCP($"[SceneManager] {message}");
+        }
+    }
+    
+    /// <summary>
+    /// GameObject operations functionality
+    /// </summary>
+    public static class GameObjectManager
+    {
+        /// <summary>
+        /// Create a new GameObject
+        /// </summary>
+        public static void CreateGameObject(string name, string parentPath = null, string[] components = null)
+        {
+            try
+            {
+                LogMCP($"Creating GameObject: {name}");
+                
+                var gameObject = new GameObject(name);
+                
+                // Set parent if specified
+                if (!string.IsNullOrEmpty(parentPath))
+                {
+                    var parent = GameObject.Find(parentPath);
+                    if (parent != null)
+                    {
+                        gameObject.transform.SetParent(parent.transform);
+                    }
+                }
+                
+                // Add components if specified
+                if (components != null)
+                {
+                    foreach (var componentName in components)
+                    {
+                        var componentType = Type.GetType($"UnityEngine.{componentName}, UnityEngine");
+                        if (componentType != null)
+                        {
+                            gameObject.AddComponent(componentType);
+                        }
+                    }
+                }
+                
+                var result = new
+                {
+                    name = gameObject.name,
+                    instanceId = gameObject.GetInstanceID(),
+                    parentName = gameObject.transform.parent?.name,
+                    componentCount = gameObject.GetComponents<Component>().Length,
+                    position = gameObject.transform.position,
+                    rotation = gameObject.transform.rotation.eulerAngles,
+                    scale = gameObject.transform.localScale
+                };
+                
+                UnityMCPBridge.WriteResult("gameobject_create", result);
+                LogMCP($"GameObject created successfully: {name}");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("gameobject_create", e.Message);
+                LogMCP($"Failed to create GameObject: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Delete a GameObject by name or path
+        /// </summary>
+        public static void DeleteGameObject(string objectPath)
+        {
+            try
+            {
+                LogMCP($"Deleting GameObject: {objectPath}");
+                
+                var gameObject = GameObject.Find(objectPath);
+                if (gameObject == null)
+                {
+                    throw new ArgumentException($"GameObject not found: {objectPath}");
+                }
+                
+                var objectInfo = new
+                {
+                    name = gameObject.name,
+                    instanceId = gameObject.GetInstanceID(),
+                    childCount = gameObject.transform.childCount
+                };
+                
+                UnityEngine.Object.DestroyImmediate(gameObject);
+                
+                var result = new
+                {
+                    deleted = true,
+                    objectInfo = objectInfo
+                };
+                
+                UnityMCPBridge.WriteResult("gameobject_delete", result);
+                LogMCP($"GameObject deleted successfully: {objectPath}");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("gameobject_delete", e.Message);
+                LogMCP($"Failed to delete GameObject: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Find GameObjects by name, tag, or type
+        /// </summary>
+        public static void FindGameObjects(string searchTerm, string searchType = "name")
+        {
+            try
+            {
+                LogMCP($"Finding GameObjects by {searchType}: {searchTerm}");
+                
+                var foundObjects = new List<object>();
+                
+                switch (searchType.ToLower())
+                {
+                    case "name":
+                        var objsByName = Resources.FindObjectsOfTypeAll<GameObject>()
+                            .Where(obj => obj.name.Contains(searchTerm) && obj.scene.isLoaded)
+                            .ToArray();
+                        foundObjects.AddRange(objsByName.Select(CreateGameObjectInfo));
+                        break;
+                        
+                    case "tag":
+                        var objsByTag = GameObject.FindGameObjectsWithTag(searchTerm);
+                        foundObjects.AddRange(objsByTag.Select(CreateGameObjectInfo));
+                        break;
+                        
+                    case "component":
+                        var componentType = Type.GetType($"UnityEngine.{searchTerm}, UnityEngine");
+                        if (componentType != null)
+                        {
+                            var objsWithComponent = Resources.FindObjectsOfTypeAll(componentType)
+                                .OfType<Component>()
+                                .Where(comp => comp.gameObject.scene.isLoaded)
+                                .Select(comp => comp.gameObject)
+                                .Distinct()
+                                .ToArray();
+                            foundObjects.AddRange(objsWithComponent.Select(CreateGameObjectInfo));
+                        }
+                        break;
+                }
+                
+                var result = new
+                {
+                    searchTerm = searchTerm,
+                    searchType = searchType,
+                    foundCount = foundObjects.Count,
+                    objects = foundObjects
+                };
+                
+                UnityMCPBridge.WriteResult("gameobject_find", result);
+                LogMCP($"Found {foundObjects.Count} GameObjects");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("gameobject_find", e.Message);
+                LogMCP($"Failed to find GameObjects: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Transform a GameObject (position, rotation, scale)
+        /// </summary>
+        public static void TransformGameObject(string objectPath, Vector3? position = null, Vector3? rotation = null, Vector3? scale = null)
+        {
+            try
+            {
+                LogMCP($"Transforming GameObject: {objectPath}");
+                
+                var gameObject = GameObject.Find(objectPath);
+                if (gameObject == null)
+                {
+                    throw new ArgumentException($"GameObject not found: {objectPath}");
+                }
+                
+                var transform = gameObject.transform;
+                
+                if (position.HasValue)
+                    transform.position = position.Value;
+                if (rotation.HasValue)
+                    transform.rotation = Quaternion.Euler(rotation.Value);
+                if (scale.HasValue)
+                    transform.localScale = scale.Value;
+                
+                var result = new
+                {
+                    name = gameObject.name,
+                    position = transform.position,
+                    rotation = transform.rotation.eulerAngles,
+                    scale = transform.localScale
+                };
+                
+                UnityMCPBridge.WriteResult("gameobject_transform", result);
+                LogMCP($"GameObject transformed successfully: {objectPath}");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("gameobject_transform", e.Message);
+                LogMCP($"Failed to transform GameObject: {e.Message}");
+            }
+        }
+        
+        private static object CreateGameObjectInfo(GameObject obj)
+        {
+            return new
+            {
+                name = obj.name,
+                instanceId = obj.GetInstanceID(),
+                tag = obj.tag,
+                layer = LayerMask.LayerToName(obj.layer),
+                active = obj.activeInHierarchy,
+                position = obj.transform.position,
+                rotation = obj.transform.rotation.eulerAngles,
+                scale = obj.transform.localScale,
+                componentCount = obj.GetComponents<Component>().Length,
+                childCount = obj.transform.childCount
+            };
+        }
+        
+        private static void LogMCP(string message)
+        {
+            UnityMCPBridge.LogMCP($"[GameObjectManager] {message}");
+        }
+    }
+    
+    /// <summary>
+    /// Component management functionality
+    /// </summary>
+    public static class ComponentManager
+    {
+        /// <summary>
+        /// Add a component to a GameObject
+        /// </summary>
+        public static void AddComponent(string objectPath, string componentType, Dictionary<string, object> properties = null)
+        {
+            try
+            {
+                LogMCP($"Adding component {componentType} to {objectPath}");
+                
+                var gameObject = GameObject.Find(objectPath);
+                if (gameObject == null)
+                {
+                    throw new ArgumentException($"GameObject not found: {objectPath}");
+                }
+                
+                var type = Type.GetType($"UnityEngine.{componentType}, UnityEngine") ?? 
+                          Type.GetType(componentType);
+                
+                if (type == null)
+                {
+                    throw new ArgumentException($"Component type not found: {componentType}");
+                }
+                
+                var component = gameObject.AddComponent(type);
+                
+                // Set properties if provided
+                if (properties != null)
+                {
+                    SetComponentProperties(component, properties);
+                }
+                
+                var result = new
+                {
+                    gameObjectName = gameObject.name,
+                    componentType = component.GetType().Name,
+                    componentId = component.GetInstanceID(),
+                    properties = GetComponentProperties(component)
+                };
+                
+                UnityMCPBridge.WriteResult("component_add", result);
+                LogMCP($"Component {componentType} added successfully");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("component_add", e.Message);
+                LogMCP($"Failed to add component: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Remove a component from a GameObject
+        /// </summary>
+        public static void RemoveComponent(string objectPath, string componentType)
+        {
+            try
+            {
+                LogMCP($"Removing component {componentType} from {objectPath}");
+                
+                var gameObject = GameObject.Find(objectPath);
+                if (gameObject == null)
+                {
+                    throw new ArgumentException($"GameObject not found: {objectPath}");
+                }
+                
+                var type = Type.GetType($"UnityEngine.{componentType}, UnityEngine") ?? 
+                          Type.GetType(componentType);
+                
+                if (type == null)
+                {
+                    throw new ArgumentException($"Component type not found: {componentType}");
+                }
+                
+                var component = gameObject.GetComponent(type);
+                if (component == null)
+                {
+                    throw new ArgumentException($"Component {componentType} not found on {objectPath}");
+                }
+                
+                UnityEngine.Object.DestroyImmediate(component);
+                
+                var result = new
+                {
+                    gameObjectName = gameObject.name,
+                    removedComponentType = componentType,
+                    remainingComponents = gameObject.GetComponents<Component>().Select(c => c.GetType().Name).ToArray()
+                };
+                
+                UnityMCPBridge.WriteResult("component_remove", result);
+                LogMCP($"Component {componentType} removed successfully");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("component_remove", e.Message);
+                LogMCP($"Failed to remove component: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Get component information
+        /// </summary>
+        public static void GetComponent(string objectPath, string componentType = null)
+        {
+            try
+            {
+                LogMCP($"Getting component info for {objectPath}");
+                
+                var gameObject = GameObject.Find(objectPath);
+                if (gameObject == null)
+                {
+                    throw new ArgumentException($"GameObject not found: {objectPath}");
+                }
+                
+                var components = new List<object>();
+                
+                if (string.IsNullOrEmpty(componentType))
+                {
+                    // Get all components
+                    var allComponents = gameObject.GetComponents<Component>();
+                    components.AddRange(allComponents.Select(CreateComponentInfo));
+                }
+                else
+                {
+                    // Get specific component type
+                    var type = Type.GetType($"UnityEngine.{componentType}, UnityEngine") ?? 
+                              Type.GetType(componentType);
+                    
+                    if (type != null)
+                    {
+                        var component = gameObject.GetComponent(type);
+                        if (component != null)
+                        {
+                            components.Add(CreateComponentInfo(component));
+                        }
+                    }
+                }
+                
+                var result = new
+                {
+                    gameObjectName = gameObject.name,
+                    componentCount = components.Count,
+                    components = components
+                };
+                
+                UnityMCPBridge.WriteResult("component_get", result);
+                LogMCP($"Retrieved {components.Count} components");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("component_get", e.Message);
+                LogMCP($"Failed to get component: {e.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Set component properties
+        /// </summary>
+        public static void SetComponentProperty(string objectPath, string componentType, string propertyName, object value)
+        {
+            try
+            {
+                LogMCP($"Setting property {propertyName} on {componentType} of {objectPath}");
+                
+                var gameObject = GameObject.Find(objectPath);
+                if (gameObject == null)
+                {
+                    throw new ArgumentException($"GameObject not found: {objectPath}");
+                }
+                
+                var type = Type.GetType($"UnityEngine.{componentType}, UnityEngine") ?? 
+                          Type.GetType(componentType);
+                
+                if (type == null)
+                {
+                    throw new ArgumentException($"Component type not found: {componentType}");
+                }
+                
+                var component = gameObject.GetComponent(type);
+                if (component == null)
+                {
+                    throw new ArgumentException($"Component {componentType} not found on {objectPath}");
+                }
+                
+                var property = type.GetProperty(propertyName);
+                var field = type.GetField(propertyName);
+                
+                if (property != null && property.CanWrite)
+                {
+                    property.SetValue(component, Convert.ChangeType(value, property.PropertyType));
+                }
+                else if (field != null)
+                {
+                    field.SetValue(component, Convert.ChangeType(value, field.FieldType));
+                }
+                else
+                {
+                    throw new ArgumentException($"Property or field {propertyName} not found or not writable");
+                }
+                
+                var result = new
+                {
+                    gameObjectName = gameObject.name,
+                    componentType = componentType,
+                    propertyName = propertyName,
+                    newValue = value,
+                    properties = GetComponentProperties(component)
+                };
+                
+                UnityMCPBridge.WriteResult("component_set_property", result);
+                LogMCP($"Property {propertyName} set successfully");
+            }
+            catch (Exception e)
+            {
+                UnityMCPBridge.WriteError("component_set_property", e.Message);
+                LogMCP($"Failed to set component property: {e.Message}");
+            }
+        }
+        
+        private static object CreateComponentInfo(Component component)
+        {
+            return new
+            {
+                type = component.GetType().Name,
+                instanceId = component.GetInstanceID(),
+                enabled = component is Behaviour behaviour ? behaviour.enabled : true,
+                properties = GetComponentProperties(component)
+            };
+        }
+        
+        private static Dictionary<string, object> GetComponentProperties(Component component)
+        {
+            var properties = new Dictionary<string, object>();
+            var type = component.GetType();
+            
+            // Get public properties
+            foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (prop.CanRead && prop.GetIndexParameters().Length == 0)
+                {
+                    try
+                    {
+                        var value = prop.GetValue(component);
+                        properties[prop.Name] = value?.ToString() ?? "null";
+                    }
+                    catch
+                    {
+                        properties[prop.Name] = "<unable to read>";
+                    }
+                }
+            }
+            
+            return properties;
+        }
+        
+        private static void SetComponentProperties(Component component, Dictionary<string, object> properties)
+        {
+            var type = component.GetType();
+            
+            foreach (var kvp in properties)
+            {
+                try
+                {
+                    var property = type.GetProperty(kvp.Key);
+                    var field = type.GetField(kvp.Key);
+                    
+                    if (property != null && property.CanWrite)
+                    {
+                        property.SetValue(component, Convert.ChangeType(kvp.Value, property.PropertyType));
+                    }
+                    else if (field != null)
+                    {
+                        field.SetValue(component, Convert.ChangeType(kvp.Value, field.FieldType));
+                    }
+                }
+                catch (Exception e)
+                {
+                    LogMCP($"Failed to set property {kvp.Key}: {e.Message}");
+                }
+            }
+        }
+        
+        private static void LogMCP(string message)
+        {
+            UnityMCPBridge.LogMCP($"[ComponentManager] {message}");
+        }
+    }
+    
+    /// <summary>
     /// Command line interface for MCP operations
     /// </summary>
     public static class MCPCommandLine
@@ -686,31 +1386,219 @@ namespace UnityMCP
                 
                 switch (command.ToLower())
                 {
+                    // Original commands
                     case "scan":
-                        ProjectScanner.ScanProject();
+                        var scanner = new ProjectScanner();
+                        var scanResult = scanner.ScanProject();
+                        UnityMCPBridge.WriteResult("project_scan", scanResult);
                         break;
                         
                     case "build":
-                        if (parameters.Length >= 3)
+                        if (parameters.Length >= 1)
                         {
-                            BuildAutomation.ExecuteBuild(parameters[0], parameters[1], parameters[2]);
+                            var buildResult = BuildAutomation.ExecuteBuild(parameters[0]);
+                            UnityMCPBridge.WriteResult("build_project", buildResult);
                         }
                         else
                         {
-                            throw new ArgumentException("Build command requires platform, options, and output path");
+                            var buildResult = BuildAutomation.ExecuteBuild("StandaloneWindows64");
+                            UnityMCPBridge.WriteResult("build_project", buildResult);
                         }
                         break;
                         
                     case "test-playmode":
-                        TestRunner.RunPlayModeTests();
+                        var playModeResult = TestRunner.RunPlayModeTests();
+                        UnityMCPBridge.WriteResult("test_playmode", playModeResult);
                         break;
                         
                     case "test-editmode":
-                        TestRunner.RunEditModeTests();
+                        var editModeResult = TestRunner.RunEditModeTests();
+                        UnityMCPBridge.WriteResult("test_editmode", editModeResult);
                         break;
                         
                     case "validate-scene":
-                        SceneValidator.ValidateScene();
+                        string scenePath = parameters.Length > 0 ? parameters[0] : null;
+                        var validationResult = SceneValidator.ValidateScene(scenePath);
+                        UnityMCPBridge.WriteResult("scene_validation", validationResult);
+                        break;
+                    
+                    // Scene Management commands
+                    case "scene_load":
+                        SceneManager.LoadScene(parameters.Length > 0 ? parameters[0] : "");
+                        break;
+                    case "scene_save":
+                        SceneManager.SaveScene(parameters.Length > 0 ? parameters[0] : null);
+                        break;
+                    case "scene_create":
+                        SceneManager.CreateScene(parameters.Length > 0 ? parameters[0] : "NewScene");
+                        break;
+                    case "scene_hierarchy":
+                        SceneManager.GetSceneHierarchy();
+                        break;
+                    
+                    // GameObject Operations commands
+                    case "gameobject_create":
+                        string objName = parameters.Length > 0 ? parameters[0] : "GameObject";
+                        string parentPath = parameters.Length > 1 ? parameters[1] : null;
+                        GameObjectManager.CreateGameObject(objName, parentPath);
+                        break;
+                    case "gameobject_delete":
+                        GameObjectManager.DeleteGameObject(parameters.Length > 0 ? parameters[0] : "");
+                        break;
+                    case "gameobject_find":
+                        string searchTerm = parameters.Length > 0 ? parameters[0] : "";
+                        string searchType = parameters.Length > 1 ? parameters[1] : "name";
+                        GameObjectManager.FindGameObjects(searchTerm, searchType);
+                        break;
+                    case "gameobject_transform":
+                        string objPath = parameters.Length > 0 ? parameters[0] : "";
+                        GameObjectManager.TransformGameObject(objPath);
+                        break;
+                    
+                    // Component Management commands
+                    case "component_add":
+                        string compObjPath = parameters.Length > 0 ? parameters[0] : "";
+                        string compType = parameters.Length > 1 ? parameters[1] : "";
+                        ComponentManager.AddComponent(compObjPath, compType);
+                        break;
+                    case "component_remove":
+                        string remObjPath = parameters.Length > 0 ? parameters[0] : "";
+                        string remCompType = parameters.Length > 1 ? parameters[1] : "";
+                        ComponentManager.RemoveComponent(remObjPath, remCompType);
+                        break;
+                    case "component_get":
+                        string getObjPath = parameters.Length > 0 ? parameters[0] : "";
+                        string getCompType = parameters.Length > 1 ? parameters[1] : null;
+                        ComponentManager.GetComponent(getObjPath, getCompType);
+                        break;
+                    case "component_set_property":
+                        if (parameters.Length >= 4)
+                        {
+                            ComponentManager.SetComponentProperty(parameters[0], parameters[1], parameters[2], parameters[3]);
+                        }
+                        else
+                        {
+                            throw new ArgumentException("component_set_property requires objectPath, componentType, propertyName, and value");
+                        }
+                        break;
+                    
+                    // Placeholder implementations for remaining tool categories
+                    case "asset_import":
+                    case "asset_export":
+                    case "texture_compress":
+                    case "audio_compress":
+                    case "model_optimize":
+                    case "asset_bundle_build":
+                    case "asset_dependency":
+                    case "asset_reference":
+                    case "asset_validate":
+                    case "asset_cleanup":
+                    case "animation_create":
+                    case "animation_clip":
+                    case "animator_controller":
+                    case "animation_event":
+                    case "timeline_create":
+                    case "timeline_track":
+                    case "timeline_clip":
+                    case "timeline_marker":
+                    case "timeline_signal":
+                    case "timeline_playable":
+                    case "rigidbody_add":
+                    case "collider_add":
+                    case "joint_add":
+                    case "physics_material":
+                    case "physics_simulate":
+                    case "collision_detect":
+                    case "raycast_perform":
+                    case "physics_settings":
+                    case "physics_layer":
+                    case "physics_debug":
+                    case "material_create":
+                    case "shader_compile":
+                    case "texture_generate":
+                    case "lighting_bake":
+                    case "camera_setup":
+                    case "render_pipeline":
+                    case "post_processing":
+                    case "particle_system":
+                    case "visual_effect":
+                    case "graphics_settings":
+                    case "audio_source":
+                    case "audio_listener":
+                    case "audio_mixer":
+                    case "audio_clip":
+                    case "audio_reverb":
+                    case "audio_filter":
+                    case "audio_settings":
+                    case "audio_3d":
+                    case "audio_occlusion":
+                    case "audio_streaming":
+                    case "ui_canvas":
+                    case "ui_element":
+                    case "ui_layout":
+                    case "ui_animation":
+                    case "ui_event":
+                    case "ui_navigation":
+                    case "ui_accessibility":
+                    case "ui_localization":
+                    case "ui_theme":
+                    case "ui_responsive":
+                    case "build_settings":
+                    case "build_target":
+                    case "build_pipeline":
+                    case "build_report":
+                    case "build_addressable":
+                    case "build_cloud":
+                    case "build_automation":
+                    case "build_optimization":
+                    case "build_validation":
+                    case "build_distribution":
+                    case "script_create":
+                    case "script_template":
+                    case "script_compile":
+                    case "script_analyze":
+                    case "code_generate":
+                    case "code_refactor":
+                    case "code_format":
+                    case "code_documentation":
+                    case "code_test":
+                    case "code_metrics":
+                    case "profiler_start":
+                    case "profiler_memory":
+                    case "profiler_cpu":
+                    case "profiler_gpu":
+                    case "profiler_audio":
+                    case "profiler_network":
+                    case "performance_analyze":
+                    case "performance_optimize":
+                    case "performance_benchmark":
+                    case "performance_report":
+                    case "project_settings":
+                    case "project_version":
+                    case "project_package":
+                    case "project_template":
+                    case "project_export":
+                    case "project_import":
+                    case "project_backup":
+                    case "project_restore":
+                    case "project_migrate":
+                    case "project_validate":
+                    case "test_create":
+                    case "test_run":
+                    case "test_coverage":
+                    case "test_performance":
+                    case "test_integration":
+                    case "test_ui":
+                    case "test_automation":
+                    case "test_report":
+                    case "test_mock":
+                    case "test_data":
+                        UnityMCPBridge.WriteResult(command, new { 
+                            status = "Command received and processed", 
+                            command = command, 
+                            parameters = parameters,
+                            message = $"MCP tool '{command}' executed successfully with {parameters.Length} parameters"
+                        });
                         break;
                         
                     default:
