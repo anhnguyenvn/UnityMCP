@@ -1,0 +1,14 @@
+{
+    "name": "com.unitymcp.bridge.Runtime",
+    "rootNamespace": "UnityMCP.Runtime",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

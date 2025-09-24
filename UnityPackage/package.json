@@ -1,0 +1,32 @@
+{
+  "name": "com.unitymcp.bridge",
+  "displayName": "Unity MCP Bridge",
+  "version": "1.0.0",
+  "unity": "2022.3",
+  "unityRelease": "0f1",
+  "description": "Bridge package for Unity MCP Server integration. Enables seamless communication between Unity Editor and MCP (Model Context Protocol) servers for AI-assisted development workflows.",
+  "keywords": [
+    "mcp",
+    "ai",
+    "automation",
+    "bridge",
+    "claude",
+    "development"
+  ],
+  "author": {
+    "name": "Unity MCP Team",
+    "email": "support@unitymcp.com"
+  },
+  "category": "Editor Extensions",
+  "dependencies": {},
+  "samples": [
+    {
+      "displayName": "Basic MCP Integration",
+      "description": "Basic example showing how to use Unity MCP Bridge",
+      "path": "Samples~/BasicIntegration"
+    }
+  ],
+  "documentationUrl": "https://github.com/anhnguyenvn/UnityMCP/wiki",
+  "changelogUrl": "https://github.com/anhnguyenvn/UnityMCP/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/anhnguyenvn/UnityMCP/blob/main/LICENSE.md"
+}
